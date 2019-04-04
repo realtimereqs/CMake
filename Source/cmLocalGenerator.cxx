@@ -879,6 +879,30 @@ void cmLocalGenerator::AddCompileOptions(std::string& flags,
     }
   }
   this->AddCompilerRequirementFlag(flags, target, lang);
+
+  cmMakefile* mf = this->GetMakefile();
+  // Add compile flag for the MSVC compiler only.
+  if (const char* enc =
+        mf->GetDefinition("CMAKE_VS_EDIT_AND_CONTINUE_DEBUGGING")) {
+    // If the target is a Managed C++ one, /ZI is not compatible.
+    if (target->GetManagedType(config) !=
+        cmGeneratorTarget::ManagedType::Managed) {
+      cmGeneratorExpression ge;
+      std::unique_ptr<cmCompiledGeneratorExpression> cge = ge.Parse(enc);
+      std::string isENCEnabled = cge->Evaluate(this, config);
+      // Only for debug configuration.
+      if (cmSystemTools::UpperCase(config) == "DEBUG") {
+        if (cmSystemTools::IsOn(isENCEnabled)) {
+          std::vector<std::string> optVec;
+          cmSystemTools::ExpandListArgument("/ZI", optVec);
+
+          // The default flags for C++ contains "/Zi"
+          cmSystemTools::ReplaceString(flags, " /Zi", "");
+          this->AppendCompileOptions(flags, optVec);
+        }
+      }
+    }
+  }
 }
 
 std::vector<BT<std::string>> cmLocalGenerator::GetIncludeDirectoriesImplicit(
